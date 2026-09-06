@@ -45,6 +45,25 @@ class DeclarativeModuleHostIntegrationTest {
     }
 
     @Test
+    fun `installing a module that is already present reports the typed already-installed error`() {
+        val host = ConvxDeclarativeModuleHost()
+        host.start(temporary.newFolder("modules3").toPath().toFile())
+        val bytes = smodPackage()
+        host.install(bytes)
+
+        try {
+            host.install(bytes)
+        } catch (error: ModuleAlreadyInstalledException) {
+            // The engine detail is preserved for the dialog's secondary text; the
+            // primary message is the localized already-installed string.
+            assertEquals("module spacemusic is already installed; upgrade with install()", error.message)
+            assertEquals(ModuleState.INSTALLED, host.snapshot().modules.single().state)
+            return
+        }
+        throw AssertionError("a duplicate install must be rejected with ModuleAlreadyInstalledException")
+    }
+
+    @Test
     fun `module can be enabled disabled and removed through the app host`() {
         val storeRoot = temporary.newFolder("modules2").toPath()
         val host = ConvxDeclarativeModuleHost()

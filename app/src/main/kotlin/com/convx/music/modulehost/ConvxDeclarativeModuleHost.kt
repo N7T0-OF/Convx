@@ -10,6 +10,14 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
+ * Thrown when a package cannot be installed because the module is already on
+ * the device. This build has no upgrade path, so the message tells the user
+ * what is true rather than pointing at an action that does not exist.
+ */
+class ModuleAlreadyInstalledException(detail: String) :
+    IllegalStateException(detail)
+
+/**
  * App-owned wrapper around the declarative module host.
  *
  * The Application calls [start] with its private files dir once at startup; the
@@ -37,7 +45,13 @@ class ConvxDeclarativeModuleHost @Inject constructor() {
     /** Install a not-yet-installed package; returns the fresh snapshot or throws. */
     @Synchronized
     fun install(packageBytes: ByteArray): DeclarativeModuleHostSnapshot {
-        host.installNew(packageBytes)
+        try {
+            host.installNew(packageBytes)
+        } catch (error: IllegalStateException) {
+            // installNew rejects only when the module is already installed
+            // (validation failures surface as ModuleValidationException first).
+            throw ModuleAlreadyInstalledException(error.message ?: "already installed")
+        }
         return host.snapshot()
     }
 

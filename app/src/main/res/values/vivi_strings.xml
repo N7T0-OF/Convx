@@ -1288,6 +1288,9 @@
     <string name="module_host_remove_confirm_title">Remove module?</string>
     <string name="module_host_remove_confirm_body">Uninstall %1$s from this device?</string>
     <string name="module_host_error">Declarative module error</string>
+    <string name="module_host_error_already_installed">This module is already installed. Upgrading an installed module is not available in this build.</string>
+    <string name="module_host_error_invalid_package">This package could not be installed because it failed validation.</string>
+    <string name="module_host_error_install">The module could not be installed.</string>
     <string name="module_state_discovered">Discovered</string>
     <string name="module_state_validated">Validated</string>
     <string name="module_state_staged">Staged</string>

@@ -2,18 +2,29 @@ package com.convx.music.ui.screens.settings
 
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ProvideTextStyle
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -23,10 +34,13 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -36,9 +50,11 @@ import com.convx.music.R
 import com.convx.music.modulehost.DeclarativeModuleHostViewModel
 import com.convx.modulehost.DeclarativeModuleHostLifecycle
 import com.convx.modulehost.ModuleState
+import com.convx.modulehost.RegisteredModule
 import com.convx.music.ui.component.IconButton
 import com.convx.music.ui.component.Material3SettingsGroup
 import com.convx.music.ui.component.Material3SettingsItem
+import com.convx.music.ui.theme.AppleTokens
 import com.convx.music.ui.utils.appTopBarWindowInsets
 import com.convx.music.ui.utils.backToMain
 
@@ -51,7 +67,7 @@ fun DeclarativeModuleHostSettingsScreen(
 ) {
     val context = LocalContext.current
     val snapshot by viewModel.snapshot.collectAsStateWithLifecycle()
-    val errorMessage by viewModel.error.collectAsStateWithLifecycle()
+    val errorState by viewModel.error.collectAsStateWithLifecycle()
     val busy by viewModel.busy.collectAsStateWithLifecycle()
     var pendingRemove by rememberSaveable { mutableStateOf<String?>(null) }
 
@@ -109,47 +125,16 @@ fun DeclarativeModuleHostSettingsScreen(
 
         if (snapshot.modules.isNotEmpty()) {
             Spacer(modifier = Modifier.height(27.dp))
-            Material3SettingsGroup(
-                title = stringResource(R.string.module_host_installed_modules),
-                items = snapshot.modules.map { module ->
-                    // Row tap toggles state only where the registry allows the
-                    // transition; removal is the trailing trash button alone, so
-                    // tapping it never also toggles the module.
-                    val rowAction: (() -> Unit)? = when (module.state) {
-                        ModuleState.INSTALLED, ModuleState.DISABLED -> {
-                            { viewModel.enable(module.manifest.id) }
-                        }
-                        ModuleState.ENABLED -> {
-                            { viewModel.disable(module.manifest.id) }
-                        }
-                        else -> null
+            ModuleListCard(
+                modules = snapshot.modules,
+                onToggle = { module ->
+                    when (module.state) {
+                        ModuleState.INSTALLED, ModuleState.DISABLED -> viewModel.enable(module.manifest.id)
+                        ModuleState.ENABLED -> viewModel.disable(module.manifest.id)
+                        else -> Unit
                     }
-                    Material3SettingsItem(
-                        icon = painterResource(R.drawable.grid_view),
-                        title = { Text(module.manifest.name) },
-                        description = {
-                            Text(
-                                stringResource(
-                                    R.string.module_host_module_state,
-                                    module.manifest.version,
-                                    stringResource(module.state.stringRes()),
-                                )
-                            )
-                        },
-                        onClick = rowAction,
-                        trailingContent = {
-                            IconButton(
-                                onClick = { pendingRemove = module.manifest.id },
-                                onLongClick = { pendingRemove = module.manifest.id },
-                            ) {
-                                Icon(
-                                    painterResource(R.drawable.delete),
-                                    contentDescription = stringResource(R.string.module_host_remove),
-                                )
-                            }
-                        },
-                    )
                 },
+                onRemove = { pendingRemove = it.manifest.id },
             )
         }
 
@@ -178,8 +163,8 @@ fun DeclarativeModuleHostSettingsScreen(
         )
     }
 
-    val message = errorMessage
-    if (message != null) {
+    val error = errorState
+    if (error != null) {
         AlertDialog(
             onDismissRequest = viewModel::dismissError,
             confirmButton = {
@@ -189,7 +174,17 @@ fun DeclarativeModuleHostSettingsScreen(
             },
             icon = { Icon(painterResource(R.drawable.error), null) },
             title = { Text(stringResource(R.string.module_host_error)) },
-            text = { Text(message) },
+            text = {
+                Column {
+                    Text(stringResource(error.messageRes))
+                    if (error.detail.isNotBlank()) {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        ProvideTextStyle(MaterialTheme.typography.bodySmall) {
+                            Text(error.detail)
+                        }
+                    }
+                }
+            },
         )
     }
 
@@ -209,6 +204,108 @@ fun DeclarativeModuleHostSettingsScreen(
         windowInsets = appTopBarWindowInsets(),
         scrollBehavior = scrollBehavior,
     )
+}
+
+/**
+ * Card listing installed modules, visually matching [Material3SettingsGroup].
+ *
+ * Unlike the shared settings group, only the icon/title/description area is
+ * clickable here: the row toggle and the trailing remove button are separate
+ * hit targets, so tapping remove never also fires the row's enable/disable.
+ */
+@Composable
+private fun ModuleListCard(
+    modules: List<RegisteredModule>,
+    onToggle: (RegisteredModule) -> Unit,
+    onRemove: (RegisteredModule) -> Unit,
+) {
+    Text(
+        text = stringResource(R.string.module_host_installed_modules),
+        style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.SemiBold),
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.padding(bottom = 8.dp, top = 8.dp),
+    )
+    Column(
+        Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(AppleTokens.CardCorner))
+            .background(MaterialTheme.colorScheme.surfaceContainer),
+    ) {
+        modules.forEachIndexed { index, module ->
+            if (index > 0) {
+                HorizontalDivider(
+                    modifier = Modifier.padding(start = 20.dp),
+                    color = MaterialTheme.colorScheme.outlineVariant,
+                    thickness = 0.5.dp,
+                )
+            }
+            ModuleRow(
+                module = module,
+                toggleable = module.state == ModuleState.INSTALLED ||
+                    module.state == ModuleState.DISABLED ||
+                    module.state == ModuleState.ENABLED,
+                onToggle = { onToggle(module) },
+                onRemove = { onRemove(module) },
+            )
+        }
+    }
+}
+
+@Composable
+private fun ModuleRow(
+    module: RegisteredModule,
+    toggleable: Boolean,
+    onToggle: () -> Unit,
+    onRemove: () -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(start = 20.dp, top = 16.dp, bottom = 16.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(
+            modifier = Modifier
+                .size(40.dp)
+                .clip(RoundedCornerShape(12.dp))
+                .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.1f)),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                painter = painterResource(R.drawable.grid_view),
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(24.dp),
+            )
+        }
+        Spacer(modifier = Modifier.width(16.dp))
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .clickable(enabled = toggleable, onClick = onToggle),
+        ) {
+            Text(module.manifest.name, style = MaterialTheme.typography.titleMedium)
+            Spacer(modifier = Modifier.height(2.dp))
+            ProvideTextStyle(MaterialTheme.typography.bodyMedium) {
+                Text(
+                    stringResource(
+                        R.string.module_host_module_state,
+                        module.manifest.version,
+                        stringResource(module.state.stringRes()),
+                    )
+                )
+            }
+        }
+        IconButton(
+            onClick = onRemove,
+            onLongClick = onRemove,
+        ) {
+            Icon(
+                painterResource(R.drawable.delete),
+                contentDescription = stringResource(R.string.module_host_remove),
+            )
+        }
+    }
 }
 
 private fun ModuleState.stringRes(): Int = when (this) {

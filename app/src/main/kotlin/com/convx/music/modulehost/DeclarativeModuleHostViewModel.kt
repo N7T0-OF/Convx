@@ -4,7 +4,9 @@ import android.content.ContentResolver
 import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.convx.music.R
 import com.convx.modulehost.DeclarativeModuleHostSnapshot
+import com.convx.modulehost.ModuleValidationException
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -14,6 +16,15 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import javax.inject.Inject
 
+/**
+ * An error worth showing the user: a localized message plus the underlying
+ * engine detail (kept secondary, useful for a bug report).
+ */
+data class ModuleHostError(
+    val messageRes: Int,
+    val detail: String,
+)
+
 @HiltViewModel
 class DeclarativeModuleHostViewModel @Inject constructor(
     private val moduleHost: ConvxDeclarativeModuleHost,
@@ -21,9 +32,9 @@ class DeclarativeModuleHostViewModel @Inject constructor(
     private val _snapshot = MutableStateFlow(moduleHost.snapshot())
     val snapshot: StateFlow<DeclarativeModuleHostSnapshot> = _snapshot.asStateFlow()
 
-    /** User-facing failure surfaced by the screen (e.g. picker read, validation). */
-    private val _error = MutableStateFlow<String?>(null)
-    val error: StateFlow<String?> = _error.asStateFlow()
+    /** Failure surfaced by the screen (e.g. picker read, validation). */
+    private val _error = MutableStateFlow<ModuleHostError?>(null)
+    val error: StateFlow<ModuleHostError?> = _error.asStateFlow()
 
     private val _busy = MutableStateFlow(false)
     val busy: StateFlow<Boolean> = _busy.asStateFlow()
@@ -32,23 +43,17 @@ class DeclarativeModuleHostViewModel @Inject constructor(
         mutate {
             val bytes = withContext(Dispatchers.IO) {
                 resolver.openInputStream(uri)?.use { it.readBytes() }
-                    ?: error("cannot read the selected file")
+                    ?: throw IllegalStateException("cannot read the selected file")
             }
             moduleHost.install(bytes)
         }
     }
 
-    fun enable(moduleId: String) {
-        mutate { moduleHost.enable(moduleId) }
-    }
+    fun enable(moduleId: String) = mutate { moduleHost.enable(moduleId) }
 
-    fun disable(moduleId: String) {
-        mutate { moduleHost.disable(moduleId) }
-    }
+    fun disable(moduleId: String) = mutate { moduleHost.disable(moduleId) }
 
-    fun remove(moduleId: String) {
-        mutate { moduleHost.remove(moduleId) }
-    }
+    fun remove(moduleId: String) = mutate { moduleHost.remove(moduleId) }
 
     fun dismissError() {
         _error.value = null
@@ -59,8 +64,12 @@ class DeclarativeModuleHostViewModel @Inject constructor(
             _busy.value = true
             try {
                 _snapshot.value = operation()
+            } catch (error: ModuleAlreadyInstalledException) {
+                _error.value = ModuleHostError(R.string.module_host_error_already_installed, error.message ?: "")
+            } catch (error: ModuleValidationException) {
+                _error.value = ModuleHostError(R.string.module_host_error_invalid_package, error.message ?: "")
             } catch (error: Exception) {
-                _error.value = error.message ?: error.javaClass.simpleName
+                _error.value = ModuleHostError(R.string.module_host_error_install, error.message ?: "")
             } finally {
                 _busy.value = false
             }
