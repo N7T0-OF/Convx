@@ -10,11 +10,11 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 /**
- * Thrown when a package cannot be installed because the module is already on
- * the device. This build has no upgrade path, so the message tells the user
- * what is true rather than pointing at an action that does not exist.
+ * Thrown when the picked package is older than the version installed on the
+ * device. Rolling back to an older version is not a user action in this build;
+ * the module keeps its newer version.
  */
-class ModuleAlreadyInstalledException(detail: String) :
+class ModuleDowngradeRejectedException(detail: String) :
     IllegalStateException(detail)
 
 /**
@@ -42,15 +42,18 @@ class ConvxDeclarativeModuleHost @Inject constructor() {
 
     fun snapshot(): DeclarativeModuleHostSnapshot = host.snapshot()
 
-    /** Install a not-yet-installed package; returns the fresh snapshot or throws. */
+    /**
+     * Install a package: fresh modules are installed, installed modules are
+     * upgraded when the version is not older. Returns the fresh snapshot or
+     * throws (validation failure, downgrade rejection).
+     */
     @Synchronized
     fun install(packageBytes: ByteArray): DeclarativeModuleHostSnapshot {
         try {
             host.installNew(packageBytes)
         } catch (error: IllegalStateException) {
-            // installNew rejects only when the module is already installed
-            // (validation failures surface as ModuleValidationException first).
-            throw ModuleAlreadyInstalledException(error.message ?: "already installed")
+            // installNew rejects an older package after validation passed.
+            throw ModuleDowngradeRejectedException(error.message ?: "older version")
         }
         return host.snapshot()
     }

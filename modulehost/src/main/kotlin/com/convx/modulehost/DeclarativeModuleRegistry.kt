@@ -38,13 +38,18 @@ class DeclarativeModuleRegistry(
         return staged
     }
 
-    /** Commit a staged install: STAGED -> INSTALLED. */
+    /** Commit a staged install: STAGED -> INSTALLED, keeping the pre-upgrade
+     *  enabled/disabled state so an upgrade never silently disables a module. */
     @Synchronized
     fun commitInstall(moduleId: String): RegisteredModule {
         val staged = modules[moduleId] ?: error("module is not registered: $moduleId")
         check(staged.state == ModuleState.STAGED) { "cannot commit ${staged.state} module: $moduleId" }
-        stagedPrevious.remove(moduleId)
-        val installed = staged.copy(state = ModuleState.INSTALLED)
+        val previousState = stagedPrevious.remove(moduleId)?.state
+        val installed = if (previousState == ModuleState.ENABLED || previousState == ModuleState.DISABLED) {
+            staged.copy(state = previousState)
+        } else {
+            staged.copy(state = ModuleState.INSTALLED)
+        }
         modules[moduleId] = installed
         onChange(snapshot())
         return installed
@@ -147,6 +152,8 @@ class DeclarativeModuleRegistry(
         val STAGEABLE = setOf(
             ModuleState.VALIDATED,
             ModuleState.INSTALLED,
+            ModuleState.ENABLED,
+            ModuleState.DISABLED,
             ModuleState.ROLLED_BACK,
         )
         val ROLLBACKABLE = setOf(

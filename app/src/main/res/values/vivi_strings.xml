@@ -1281,14 +1281,14 @@
     <string name="module_host_version">Convx %1$s</string>
     <string name="module_host_scope">Declarative packages only; no playback or executable code.</string>
     <string name="module_host_install">Install module</string>
-    <string name="module_host_install_hint">Pick a .smod package file</string>
+    <string name="module_host_install_hint">Install a .smod package; picking a newer version upgrades the module</string>
     <string name="module_host_installed_modules">Installed modules</string>
     <string name="module_host_module_state">%1$s · %2$s</string>
     <string name="module_host_remove">Remove</string>
     <string name="module_host_remove_confirm_title">Remove module?</string>
     <string name="module_host_remove_confirm_body">Uninstall %1$s from this device?</string>
     <string name="module_host_error">Declarative module error</string>
-    <string name="module_host_error_already_installed">This module is already installed. Upgrading an installed module is not available in this build.</string>
+    <string name="module_host_error_downgrade">This package is older than the installed version, so it was not installed. The installed module keeps its current version.</string>
     <string name="module_host_error_invalid_package">This package could not be installed because it failed validation.</string>
     <string name="module_host_error_install">The module could not be installed.</string>
     <string name="module_state_discovered">Discovered</string>

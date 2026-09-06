@@ -45,22 +45,32 @@ class DeclarativeModuleHostIntegrationTest {
     }
 
     @Test
-    fun `installing a module that is already present reports the typed already-installed error`() {
+    fun `an enabled module stays enabled when upgraded to a newer package`() {
         val host = ConvxDeclarativeModuleHost()
         host.start(temporary.newFolder("modules3").toPath().toFile())
-        val bytes = smodPackage()
-        host.install(bytes)
+        host.install(smodPackage(version = "0.1.0"))
+        host.enable("spacemusic")
+
+        val upgraded = host.install(smodPackage(version = "0.1.1"))
+        val module = upgraded.modules.single()
+        assertEquals("0.1.1", module.manifest.version)
+        assertEquals(ModuleState.ENABLED, module.state)
+    }
+
+    @Test
+    fun `installing an older version is rejected with a typed downgrade error`() {
+        val host = ConvxDeclarativeModuleHost()
+        host.start(temporary.newFolder("modules4").toPath().toFile())
+        host.install(smodPackage(version = "0.1.1"))
 
         try {
-            host.install(bytes)
-        } catch (error: ModuleAlreadyInstalledException) {
-            // The engine detail is preserved for the dialog's secondary text; the
-            // primary message is the localized already-installed string.
-            assertEquals("module spacemusic is already installed; upgrade with install()", error.message)
+            host.install(smodPackage(version = "0.1.0"))
+        } catch (error: ModuleDowngradeRejectedException) {
             assertEquals(ModuleState.INSTALLED, host.snapshot().modules.single().state)
+            assertEquals("0.1.1", host.snapshot().modules.single().manifest.version)
             return
         }
-        throw AssertionError("a duplicate install must be rejected with ModuleAlreadyInstalledException")
+        throw AssertionError("an older package must be rejected with ModuleDowngradeRejectedException")
     }
 
     @Test
@@ -77,14 +87,14 @@ class DeclarativeModuleHostIntegrationTest {
         assertTrue(Files.notExists(storeRoot.resolve("modules/spacemusic/current.smod")))
     }
 
-    private fun smodPackage(): ByteArray {
+    private fun smodPackage(version: String = "0.1.0"): ByteArray {
         val manifest = """
             {
               "${'$'}schema":"https://raw.githubusercontent.com/N7T0-OF/Spacemusic/main/schemas/manifest.schema.json",
               "schemaVersion":"0.1",
               "id":"spacemusic",
               "name":"SpaceMusic",
-              "version":"0.1.0",
+              "version":"$version",
               "type":"declarative",
               "description":"A declarative music module for Convx.",
               "author":"N7T0-OF",

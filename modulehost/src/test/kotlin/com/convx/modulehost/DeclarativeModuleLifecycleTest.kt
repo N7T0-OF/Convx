@@ -119,18 +119,66 @@ class DeclarativeModuleLifecycleTest {
     }
 
     @Test
-    fun `installNew registers a fresh package and remove uninstalls it`() {
+    fun `installNew installs fresh and upgrades an installed module without downgrading`() {
         val store = ModuleStore(temporary.newFolder("store").toPath())
         val host = DeclarativeModuleHost("1.5.2", store)
         host.start()
-        val bytes = TestModulePackages.packageBytes()
+        val v0 = TestModulePackages.packageBytes()
+        val v1 = TestModulePackages.packageBytes(
+            manifest = TestModulePackages.manifestJson(version = "0.1.1"),
+        )
 
-        assertEquals(ModuleState.INSTALLED, host.installNew(bytes).state)
-        assertStateRejected { host.installNew(bytes) }
+        assertEquals(ModuleState.INSTALLED, host.installNew(v0).state)
+        // Same-version reinstall is a repair; a newer version upgrades in place.
+        assertEquals(ModuleState.INSTALLED, host.installNew(v0).state)
+        assertEquals("0.1.1", host.installNew(v1).manifest.version)
+        assertStateRejected { host.installNew(v0) } // older version must not regress the module
+
         assertTrue("remove must report the module was present", host.remove("spacemusic"))
         assertTrue(host.snapshot().modules.isEmpty())
         assertEquals("store must forget the package bytes", null, store.currentPackage("spacemusic"))
         assertTrue("removing an unknown module is a no-op", !host.remove("spacemusic"))
+    }
+
+    @Test
+    fun `upgrading an enabled module keeps it enabled and upgradeTo rejects older versions`() {
+        val store = ModuleStore(temporary.newFolder("store").toPath())
+        val host = DeclarativeModuleHost("1.5.2", store)
+        host.start()
+        val v0 = TestModulePackages.packageBytes()
+        val v1 = TestModulePackages.packageBytes(
+            manifest = TestModulePackages.manifestJson(version = "0.1.1"),
+        )
+        host.installNew(v0)
+        host.enable("spacemusic")
+
+        val upgraded = host.upgradeTo(v1)
+        assertEquals("0.1.1", upgraded.manifest.version)
+        assertEquals(ModuleState.ENABLED, upgraded.state)
+        assertTrue("enabled module must not need re-enabling after upgrade",
+            host.snapshot().modules.single().state == ModuleState.ENABLED)
+        assertStateRejected { host.upgradeTo(v0) }
+    }
+
+    @Test
+    fun `upgrading a disabled module keeps it disabled and version order is semver`() {
+        val store = ModuleStore(temporary.newFolder("store").toPath())
+        val host = DeclarativeModuleHost("1.5.2", store)
+        host.start()
+        val v0 = TestModulePackages.packageBytes(
+            manifest = TestModulePackages.manifestJson(version = "0.1.9"),
+        )
+        host.installNew(v0)
+        host.enable("spacemusic")
+        host.disable("spacemusic")
+
+        // 0.1.10 > 0.1.9 in SemVer even though "0.1.10" < "0.1.9" lexically.
+        val v10 = TestModulePackages.packageBytes(
+            manifest = TestModulePackages.manifestJson(version = "0.1.10"),
+        )
+        val upgraded = host.upgradeTo(v10)
+        assertEquals("0.1.10", upgraded.manifest.version)
+        assertEquals(ModuleState.DISABLED, upgraded.state)
     }
 
     @Test

@@ -56,22 +56,11 @@ class DeclarativeModuleHost(
     /**
      * Install a package that is not yet installed, registering it when needed:
      * fresh package -> VALIDATED -> INSTALLED. Installing over an already
-     * installed/enabled/disabled module is rejected (use [install] to upgrade).
+     * installed module upgrades it when the version is not older (see
+     * [upgradeTo]).
      */
     @Synchronized
-    fun installNew(packageBytes: ByteArray): RegisteredModule {
-        checkStarted()
-        val validated = validate(packageBytes)
-        val moduleId = validated.manifest.id
-        val current = registry.get(moduleId)
-        check(current == null || current.state == ModuleState.VALIDATED) {
-            "module $moduleId is already installed; upgrade with install()"
-        }
-        if (current == null) {
-            registry.registerValidated(validated)
-        }
-        return install(moduleId, packageBytes)
-    }
+    fun installNew(packageBytes: ByteArray): RegisteredModule = upgradeTo(packageBytes)
 
     /**
      * Atomically install or upgrade a registered module.
@@ -79,7 +68,8 @@ class DeclarativeModuleHost(
      * [expectedSha256], when given, is verified before staging. The package is
      * written to a staging slot, then committed; a failure restores the previous
      * package bytes and marks the module [ModuleState.ROLLED_BACK] (or FAILED when
-     * there was no previous version).
+     * there was no previous version). Version ordering is the caller's policy
+     * (see [upgradeTo]); this method is mechanical staging/commit/rollback.
      */
     @Synchronized
     fun install(moduleId: String, packageBytes: ByteArray, expectedSha256: String? = null): RegisteredModule {
@@ -97,6 +87,33 @@ class DeclarativeModuleHost(
             runCatching { store?.rollbackPackage(moduleId) }
             registry.failInstall(moduleId)
             throw ModuleValidationException("install of $moduleId failed and was rolled back", error)
+        }
+    }
+
+    /**
+     * Upgrade an installed module to a newer package, or install it when it is
+     * not installed yet. Installing the same version (repair) is allowed;
+     * installing an older version is rejected - use [rollback] to go back.
+     */
+    @Synchronized
+    fun upgradeTo(packageBytes: ByteArray): RegisteredModule {
+        checkStarted()
+        val validated = validate(packageBytes)
+        val moduleId = validated.manifest.id
+        val current = registry.get(moduleId)
+        if (current == null) {
+            registry.registerValidated(validated)
+        } else if (current.state != ModuleState.VALIDATED) {
+            checkNotOlder(current, validated)
+        }
+        return install(moduleId, packageBytes)
+    }
+
+    private fun checkNotOlder(current: RegisteredModule, validated: ValidatedModulePackage) {
+        val installed = ModuleVersion.parse(current.manifest.version, "installed version")
+        val incoming = ModuleVersion.parse(validated.manifest.version, "package version")
+        check(installed <= incoming) {
+            "cannot install ${validated.manifest.version}: module ${current.manifest.id} is already at ${current.manifest.version}"
         }
     }
 

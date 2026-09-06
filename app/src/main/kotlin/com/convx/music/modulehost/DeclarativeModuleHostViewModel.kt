@@ -64,8 +64,8 @@ class DeclarativeModuleHostViewModel @Inject constructor(
             _busy.value = true
             try {
                 _snapshot.value = operation()
-            } catch (error: ModuleAlreadyInstalledException) {
-                _error.value = ModuleHostError(R.string.module_host_error_already_installed, error.message ?: "")
+            } catch (error: ModuleDowngradeRejectedException) {
+                _error.value = ModuleHostError(R.string.module_host_error_downgrade, error.message ?: "")
             } catch (error: ModuleValidationException) {
                 _error.value = ModuleHostError(R.string.module_host_error_invalid_package, error.message ?: "")
             } catch (error: Exception) {
