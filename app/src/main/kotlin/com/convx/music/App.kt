@@ -74,7 +74,9 @@ class App : Application(), SingletonImageLoader.Factory {
         super.onCreate()
         // The Application is the single lifecycle owner for the declarative host.
         // Settings only observes its snapshot; it does not start a second host.
-        declarativeModuleHost.start()
+        // The private files dir is the persistent store root: registry state and
+        // installed package bytes survive process restarts here.
+        declarativeModuleHost.start(filesDir)
 
         // Restored synchronously, before anything else can start: the async
         // DataStore collector further down (applicationScope.launch { ... }

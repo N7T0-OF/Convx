@@ -119,6 +119,21 @@ class DeclarativeModuleLifecycleTest {
     }
 
     @Test
+    fun `installNew registers a fresh package and remove uninstalls it`() {
+        val store = ModuleStore(temporary.newFolder("store").toPath())
+        val host = DeclarativeModuleHost("1.5.2", store)
+        host.start()
+        val bytes = TestModulePackages.packageBytes()
+
+        assertEquals(ModuleState.INSTALLED, host.installNew(bytes).state)
+        assertStateRejected { host.installNew(bytes) }
+        assertTrue("remove must report the module was present", host.remove("spacemusic"))
+        assertTrue(host.snapshot().modules.isEmpty())
+        assertEquals("store must forget the package bytes", null, store.currentPackage("spacemusic"))
+        assertTrue("removing an unknown module is a no-op", !host.remove("spacemusic"))
+    }
+
+    @Test
     fun `registry rejects invalid staged lifecycle transitions`() {
         val registry = DeclarativeModuleRegistry()
         val host = DeclarativeModuleHost("1.5.2")

@@ -61,6 +61,16 @@ class ModuleStore(private val root: Path) {
         moveReplacing(staged, current)
     }
 
+    /** Delete every stored artifact for a module (uninstall). */
+    fun deleteModule(moduleId: String) {
+        val dir = moduleDir(moduleId)
+        if (Files.isDirectory(dir)) {
+            Files.walk(dir).use { paths ->
+                paths.sorted(Comparator.reverseOrder()).forEach(Files::delete)
+            }
+        }
+    }
+
     fun rollbackPackage(moduleId: String) {
         val directory = moduleDir(moduleId)
         val previous = directory.resolve("previous.smod")

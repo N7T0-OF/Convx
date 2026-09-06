@@ -105,6 +105,17 @@ class DeclarativeModuleRegistry(
         next = ModuleState.DISABLED,
     )
 
+    /** Forget a module entirely (uninstall). No-op when it is not registered. */
+    @Synchronized
+    fun remove(moduleId: String): Boolean {
+        val removed = modules.remove(moduleId) != null
+        if (removed) {
+            stagedPrevious.remove(moduleId)
+            onChange(snapshot())
+        }
+        return removed
+    }
+
     @Synchronized
     fun get(moduleId: String): RegisteredModule? = modules[moduleId]
 
