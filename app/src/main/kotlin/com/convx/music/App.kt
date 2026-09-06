@@ -33,6 +33,7 @@ import com.music.kugou.KuGou
 import com.music.lastfm.LastFM
 import com.convx.music.constants.*
 import com.convx.music.di.ApplicationScope
+import com.convx.music.modulehost.ConvxDeclarativeModuleHost
 import com.convx.music.extensions.toEnum
 import com.convx.music.extensions.toInetSocketAddress
 import com.convx.music.utils.CrashHandler
@@ -66,8 +67,14 @@ class App : Application(), SingletonImageLoader.Factory {
     @ApplicationScope
     lateinit var applicationScope: CoroutineScope
 
+    @Inject
+    lateinit var declarativeModuleHost: ConvxDeclarativeModuleHost
+
     override fun onCreate() {
         super.onCreate()
+        // The Application is the single lifecycle owner for the declarative host.
+        // Settings only observes its snapshot; it does not start a second host.
+        declarativeModuleHost.start()
 
         // Restored synchronously, before anything else can start: the async
         // DataStore collector further down (applicationScope.launch { ... }

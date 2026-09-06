@@ -1274,6 +1274,15 @@
     <string name="library_icons_only">Library Icons Only</string>
     <string name="library_icons_only_desc">Show simple icons instead of artwork thumbnails in the library</string>
 
+    <!-- Declarative module host -->
+    <string name="declarative_modules">Declarative Modules</string>
+    <string name="module_host_ready">Module host ready</string>
+    <string name="module_host_not_started">Module host not started</string>
+    <string name="module_host_version">Convx %1$s</string>
+    <string name="module_host_registered_modules">Registered modules: %1$d</string>
+    <string name="module_host_no_installation">Package installation is not enabled yet.</string>
+    <string name="module_host_scope">Declarative packages only; no playback or executable code.</string>
+
     <string name="app_font">App Font</string>
     <string name="font_selection">Font Selection</string>
     <string name="font_additional">Additional Fonts</string>
