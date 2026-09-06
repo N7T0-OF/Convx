@@ -1291,6 +1291,15 @@
     <string name="module_host_error_downgrade">This package is older than the installed version, so it was not installed. The installed module keeps its current version.</string>
     <string name="module_host_error_invalid_package">This package could not be installed because it failed validation.</string>
     <string name="module_host_error_install">The module could not be installed.</string>
+    <string name="module_host_check_updates">Check for updates</string>
+    <string name="module_host_check_updates_hint">Fetch the module release feed and upgrade when a newer version is published.</string>
+    <string name="module_host_update_available_title">Update available</string>
+    <string name="module_host_update_available_body">%1$s %2$s is available. Installed version: %3$s</string>
+    <string name="module_host_update">Update</string>
+    <string name="module_host_later">Later</string>
+    <string name="module_host_up_to_date">The module is up to date.</string>
+    <string name="module_host_no_compatible">No published release is compatible with this Convx version.</string>
+    <string name="module_host_update_failed">The module update could not be completed.</string>
     <string name="module_state_discovered">Discovered</string>
     <string name="module_state_validated">Validated</string>
     <string name="module_state_staged">Staged</string>

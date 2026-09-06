@@ -2,7 +2,13 @@ package com.convx.modulehost
 
 import java.math.BigInteger
 
-internal class ModuleVersion private constructor(
+/**
+ * Parsed SemVer with precedence ordering per the SemVer 2.0.0 spec.
+ *
+ * Public so host integrations can compare an installed version with a
+ * feed release without duplicating precedence logic.
+ */
+class ModuleVersion private constructor(
     private val major: BigInteger,
     private val minor: BigInteger,
     private val patch: BigInteger,

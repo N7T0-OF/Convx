@@ -69,6 +69,8 @@ fun DeclarativeModuleHostSettingsScreen(
     val snapshot by viewModel.snapshot.collectAsStateWithLifecycle()
     val errorState by viewModel.error.collectAsStateWithLifecycle()
     val busy by viewModel.busy.collectAsStateWithLifecycle()
+    val updateOffer by viewModel.updateOffer.collectAsStateWithLifecycle()
+    val updateInfo by viewModel.updateInfo.collectAsStateWithLifecycle()
     var pendingRemove by rememberSaveable { mutableStateOf<String?>(null) }
 
     val installLauncher = rememberLauncherForActivityResult(
@@ -104,6 +106,15 @@ fun DeclarativeModuleHostSettingsScreen(
                         description = { Text(stringResource(R.string.module_host_install_hint)) },
                         enabled = started && !busy,
                         onClick = { installLauncher.launch(arrayOf("application/octet-stream")) },
+                    )
+                )
+                add(
+                    Material3SettingsItem(
+                        icon = painterResource(R.drawable.deployed_app_update),
+                        title = { Text(stringResource(R.string.module_host_check_updates)) },
+                        description = { Text(stringResource(R.string.module_host_check_updates_hint)) },
+                        enabled = started && !busy && snapshot.modules.isNotEmpty(),
+                        onClick = { viewModel.checkForUpdates(snapshot.modules.first().manifest.id) },
                     )
                 )
                 add(
@@ -185,6 +196,48 @@ fun DeclarativeModuleHostSettingsScreen(
                     }
                 }
             },
+        )
+    }
+
+    val offerState = updateOffer
+    if (offerState != null) {
+        AlertDialog(
+            onDismissRequest = viewModel::dismissUpdateOffer,
+            title = { Text(stringResource(R.string.module_host_update_available_title)) },
+            text = {
+                Text(
+                    stringResource(
+                        R.string.module_host_update_available_body,
+                        offerState.moduleName,
+                        offerState.release.version,
+                        offerState.installedVersion,
+                    )
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = viewModel::applyUpdate, enabled = !busy) {
+                    Text(stringResource(R.string.module_host_update))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = viewModel::dismissUpdateOffer, enabled = !busy) {
+                    Text(stringResource(R.string.module_host_later))
+                }
+            },
+        )
+    }
+
+    val infoRes = updateInfo
+    if (infoRes != null) {
+        AlertDialog(
+            onDismissRequest = viewModel::dismissUpdateInfo,
+            confirmButton = {
+                TextButton(onClick = viewModel::dismissUpdateInfo) {
+                    Text(stringResource(android.R.string.ok))
+                }
+            },
+            title = { Text(stringResource(R.string.module_host_check_updates)) },
+            text = { Text(stringResource(infoRes)) },
         )
     }
 
