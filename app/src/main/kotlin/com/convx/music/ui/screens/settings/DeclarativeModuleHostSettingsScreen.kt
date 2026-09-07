@@ -19,14 +19,12 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ProvideTextStyle
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarScrollBehavior
 import androidx.compose.runtime.Composable
@@ -69,8 +67,6 @@ fun DeclarativeModuleHostSettingsScreen(
     val snapshot by viewModel.snapshot.collectAsStateWithLifecycle()
     val errorState by viewModel.error.collectAsStateWithLifecycle()
     val busy by viewModel.busy.collectAsStateWithLifecycle()
-    val updateOffer by viewModel.updateOffer.collectAsStateWithLifecycle()
-    val updateInfo by viewModel.updateInfo.collectAsStateWithLifecycle()
     var pendingRemove by rememberSaveable { mutableStateOf<String?>(null) }
 
     val installLauncher = rememberLauncherForActivityResult(
@@ -110,15 +106,6 @@ fun DeclarativeModuleHostSettingsScreen(
                 )
                 add(
                     Material3SettingsItem(
-                        icon = painterResource(R.drawable.deployed_app_update),
-                        title = { Text(stringResource(R.string.module_host_check_updates)) },
-                        description = { Text(stringResource(R.string.module_host_check_updates_hint)) },
-                        enabled = started && !busy && snapshot.modules.isNotEmpty(),
-                        onClick = { viewModel.checkForUpdates(snapshot.modules.first().manifest.id) },
-                    )
-                )
-                add(
-                    Material3SettingsItem(
                         icon = painterResource(R.drawable.info),
                         title = {
                             Text(
@@ -138,12 +125,8 @@ fun DeclarativeModuleHostSettingsScreen(
             Spacer(modifier = Modifier.height(27.dp))
             ModuleListCard(
                 modules = snapshot.modules,
-                onToggle = { module ->
-                    when (module.state) {
-                        ModuleState.INSTALLED, ModuleState.DISABLED -> viewModel.enable(module.manifest.id)
-                        ModuleState.ENABLED -> viewModel.disable(module.manifest.id)
-                        else -> Unit
-                    }
+                onOpen = { module ->
+                    navController.navigate(com.convx.music.modulehost.DeclarativeModuleHostRoutes.detail(module.manifest.id))
                 },
                 onRemove = { pendingRemove = it.manifest.id },
             )
@@ -154,92 +137,16 @@ fun DeclarativeModuleHostSettingsScreen(
 
     val removing = pendingRemove?.let { id -> snapshot.modules.firstOrNull { it.manifest.id == id } }
     if (removing != null) {
-        AlertDialog(
-            onDismissRequest = { pendingRemove = null },
-            title = { Text(stringResource(R.string.module_host_remove_confirm_title)) },
-            text = { Text(stringResource(R.string.module_host_remove_confirm_body, removing.manifest.name)) },
-            confirmButton = {
-                TextButton(onClick = {
-                    viewModel.remove(removing.manifest.id)
-                    pendingRemove = null
-                }) {
-                    Text(stringResource(R.string.module_host_remove))
-                }
+        ModuleHostRemoveDialog(
+            moduleName = removing.manifest.name,
+            onConfirm = {
+                viewModel.remove(removing.manifest.id)
+                pendingRemove = null
             },
-            dismissButton = {
-                TextButton(onClick = { pendingRemove = null }) {
-                    Text(stringResource(android.R.string.cancel))
-                }
-            },
+            onDismiss = { pendingRemove = null },
         )
     }
-
-    val error = errorState
-    if (error != null) {
-        AlertDialog(
-            onDismissRequest = viewModel::dismissError,
-            confirmButton = {
-                TextButton(onClick = viewModel::dismissError) {
-                    Text(stringResource(android.R.string.ok))
-                }
-            },
-            icon = { Icon(painterResource(R.drawable.error), null) },
-            title = { Text(stringResource(R.string.module_host_error)) },
-            text = {
-                Column {
-                    Text(stringResource(error.messageRes))
-                    if (error.detail.isNotBlank()) {
-                        Spacer(modifier = Modifier.height(8.dp))
-                        ProvideTextStyle(MaterialTheme.typography.bodySmall) {
-                            Text(error.detail)
-                        }
-                    }
-                }
-            },
-        )
-    }
-
-    val offerState = updateOffer
-    if (offerState != null) {
-        AlertDialog(
-            onDismissRequest = viewModel::dismissUpdateOffer,
-            title = { Text(stringResource(R.string.module_host_update_available_title)) },
-            text = {
-                Text(
-                    stringResource(
-                        R.string.module_host_update_available_body,
-                        offerState.moduleName,
-                        offerState.release.version,
-                        offerState.installedVersion,
-                    )
-                )
-            },
-            confirmButton = {
-                TextButton(onClick = viewModel::applyUpdate, enabled = !busy) {
-                    Text(stringResource(R.string.module_host_update))
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = viewModel::dismissUpdateOffer, enabled = !busy) {
-                    Text(stringResource(R.string.module_host_later))
-                }
-            },
-        )
-    }
-
-    val infoRes = updateInfo
-    if (infoRes != null) {
-        AlertDialog(
-            onDismissRequest = viewModel::dismissUpdateInfo,
-            confirmButton = {
-                TextButton(onClick = viewModel::dismissUpdateInfo) {
-                    Text(stringResource(android.R.string.ok))
-                }
-            },
-            title = { Text(stringResource(R.string.module_host_check_updates)) },
-            text = { Text(stringResource(infoRes)) },
-        )
-    }
+    ModuleHostErrorDialog(errorState, viewModel::dismissError)
 
     TopAppBar(
         title = { Text(stringResource(R.string.declarative_modules)) },
@@ -262,14 +169,13 @@ fun DeclarativeModuleHostSettingsScreen(
 /**
  * Card listing installed modules, visually matching [Material3SettingsGroup].
  *
- * Unlike the shared settings group, only the icon/title/description area is
- * clickable here: the row toggle and the trailing remove button are separate
- * hit targets, so tapping remove never also fires the row's enable/disable.
+ * Tapping a row opens that module's generic detail page; the trailing remove
+ * button is an independent hit target so it never also fires the row click.
  */
 @Composable
 private fun ModuleListCard(
     modules: List<RegisteredModule>,
-    onToggle: (RegisteredModule) -> Unit,
+    onOpen: (RegisteredModule) -> Unit,
     onRemove: (RegisteredModule) -> Unit,
 ) {
     Text(
@@ -294,10 +200,7 @@ private fun ModuleListCard(
             }
             ModuleRow(
                 module = module,
-                toggleable = module.state == ModuleState.INSTALLED ||
-                    module.state == ModuleState.DISABLED ||
-                    module.state == ModuleState.ENABLED,
-                onToggle = { onToggle(module) },
+                onOpen = { onOpen(module) },
                 onRemove = { onRemove(module) },
             )
         }
@@ -307,8 +210,7 @@ private fun ModuleListCard(
 @Composable
 private fun ModuleRow(
     module: RegisteredModule,
-    toggleable: Boolean,
-    onToggle: () -> Unit,
+    onOpen: () -> Unit,
     onRemove: () -> Unit,
 ) {
     Row(
@@ -335,7 +237,7 @@ private fun ModuleRow(
         Column(
             modifier = Modifier
                 .weight(1f)
-                .clickable(enabled = toggleable, onClick = onToggle),
+                .clickable(onClick = onOpen),
         ) {
             Text(module.manifest.name, style = MaterialTheme.typography.titleMedium)
             Spacer(modifier = Modifier.height(2.dp))

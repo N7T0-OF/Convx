@@ -1293,6 +1293,17 @@
     <string name="module_host_error_install">The module could not be installed.</string>
     <string name="module_host_check_updates">Check for updates</string>
     <string name="module_host_check_updates_hint">Fetch the module release feed and upgrade when a newer version is published.</string>
+    <string name="module_host_module">Module</string>
+    <string name="module_host_missing">Module not found</string>
+    <string name="module_host_actions">Actions</string>
+    <string name="module_host_enable_module">Enable module</string>
+    <string name="module_host_disable_module">Disable module</string>
+    <string name="module_host_information">Module information</string>
+    <string name="module_host_field_id">Module ID</string>
+    <string name="module_host_field_author">Author</string>
+    <string name="module_host_field_type">Type</string>
+    <string name="module_host_field_compatibility">Convx compatibility</string>
+    <string name="module_host_field_permissions">Permissions</string>
     <string name="module_host_update_available_title">Update available</string>
     <string name="module_host_update_available_body">%1$s %2$s is available. Installed version: %3$s</string>
     <string name="module_host_update">Update</string>

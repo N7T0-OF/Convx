@@ -81,4 +81,9 @@ class ConvxDeclarativeModuleHost @Inject constructor() {
 
 object DeclarativeModuleHostRoutes {
     const val SETTINGS = "settings/declarative-modules"
+
+    /** Generic per-module detail page: rendered from the module's declared data. */
+    const val DETAIL = "settings/declarative-modules/{moduleId}"
+
+    fun detail(moduleId: String): String = "settings/declarative-modules/$moduleId"
 }
